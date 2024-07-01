@@ -22,8 +22,8 @@ This tool is designed to brute force the password of an Excel file. It allows co
 1. Clone the repository:
 
    ```sh
-   git clone https://github.com/yourusername/ExcelPasswordBruteForce.git
-   cd ExcelPasswordBruteForce
+   git clone https://github.com/MounsC/ExcelUnlocker.git
+   cd ExcelUnlocker
    ```
 
 2. Install dependencies:
