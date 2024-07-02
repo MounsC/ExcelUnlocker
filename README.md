@@ -15,7 +15,7 @@ This tool is designed to brute force the password of an Excel file. It allows co
 ## Prerequisites
 
 - .NET Core 8
-- ExcelDataReader library
+- EEPlus library
 
 ## Installation
 
