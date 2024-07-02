@@ -2,6 +2,10 @@
 
 class Program
 {
+    private static readonly object fileLock = new object();
+    private static BlockingCollection<string> testedPasswordsQueue = new BlockingCollection<string>();
+    private static ConcurrentDictionary<string, bool> testedPasswords = new ConcurrentDictionary<string, bool>();
+
     static void Main(string[] args)
     {
         string configFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
@@ -17,7 +21,7 @@ class Program
         }
 
         var passwordGenerator = new PasswordGenerator(config);
-        var testedPasswords = LoadTestedPasswords();
+        LoadTestedPasswords();
         int attemptCount = testedPasswords.Count;
 
         Console.WriteLine("Tentatives de mot de passe:");
@@ -27,12 +31,10 @@ class Program
 
         Parallel.For(config.MinPasswordLength, config.MaxPasswordLength + 1, length =>
         {
-            var passwords = passwordGenerator.GeneratePasswords(length);
-
-            Parallel.ForEach(passwords, password =>
+            foreach (var password in passwordGenerator.GeneratePasswords(length))
             {
-                if (testedPasswords.Contains(password) || passwordFound.Count > 0)
-                    return;
+                if (testedPasswords.ContainsKey(password) || passwordFound.Count > 0)
+                    continue;
 
                 attemptCount++;
                 Console.SetCursorPosition(0, 1);
@@ -44,20 +46,24 @@ class Program
                 {
                     Console.WriteLine($"\nMot de passe trouvé: {password}");
                     passwordFound.Add(password);
-                    return;
+                    break;
                 }
 
-                testedPasswords.Add(password);
+                testedPasswords.TryAdd(password, true);
+                testedPasswordsQueue.Add(password);
+
                 if (attemptCount % 1000 == 0)
                 {
-                    SaveTestedPasswords(testedPasswords);
+                    SaveTestedPasswords();
                 }
-            });
+
+                Thread.Sleep(10);
+            }
         });
 
         if (passwordFound.Count == 0)
         {
-            SaveTestedPasswords(testedPasswords);
+            SaveTestedPasswords();
             Console.WriteLine($"\nMot de passe non trouvé après {attemptCount} tentatives.");
         }
         else
@@ -66,22 +72,37 @@ class Program
         }
     }
 
-    static HashSet<string> LoadTestedPasswords()
+    static void LoadTestedPasswords()
     {
         string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tested_passwords.txt");
 
         if (!File.Exists(filePath))
         {
-            return new HashSet<string>();
+            return;
         }
 
         var passwords = File.ReadAllLines(filePath);
-        return new HashSet<string>(passwords);
+        foreach (var password in passwords)
+        {
+            testedPasswords.TryAdd(password, true);
+        }
     }
 
-    static void SaveTestedPasswords(HashSet<string> testedPasswords)
+    static void SaveTestedPasswords()
     {
         string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tested_passwords.txt");
-        File.WriteAllLines(filePath, testedPasswords);
+
+        lock (fileLock)
+        {
+            try
+            {
+                File.AppendAllLines(filePath, testedPasswordsQueue);
+                testedPasswordsQueue = new BlockingCollection<string>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de la sauvegarde des mots de passe testés: {ex.Message}");
+            }
+        }
     }
 }
