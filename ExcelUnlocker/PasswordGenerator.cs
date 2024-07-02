@@ -30,19 +30,24 @@
 
     public IEnumerable<string> GeneratePasswords(int length)
     {
-        var combinations = new List<string> { "" };
-        for (int i = 0; i < length; i++)
+        return GeneratePasswordsRecursive("", length);
+    }
+
+    private IEnumerable<string> GeneratePasswordsRecursive(string prefix, int length)
+    {
+        if (length == 0)
         {
-            var newCombinations = new List<string>();
-            foreach (var combo in combinations)
+            yield return prefix;
+        }
+        else
+        {
+            foreach (var c in _charSet)
             {
-                foreach (var c in _charSet)
+                foreach (var password in GeneratePasswordsRecursive(prefix + c, length - 1))
                 {
-                    newCombinations.Add(combo + c);
+                    yield return password;
                 }
             }
-            combinations = newCombinations;
         }
-        return combinations;
     }
 }

@@ -1,4 +1,4 @@
-﻿using ExcelDataReader;
+﻿using OfficeOpenXml;
 
 public class ExcelHandler
 {
@@ -39,22 +39,23 @@ public class ExcelHandler
     {
         try
         {
-            using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read))
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+            using (var package = new ExcelPackage(new FileInfo(filePath), password))
             {
-                var conf = new ExcelReaderConfiguration { Password = password };
-                using (var reader = ExcelReaderFactory.CreateReader(stream, conf))
-                {
-                    if (reader != null)
-                    {
-                        return true;
-                    }
-                }
+                SavePassword(password);
+                return true;
             }
         }
         catch
         {
-            // Ignore
+            return false;
         }
-        return false;
+    }
+
+    public void SavePassword(string password)
+    {
+        string passwordFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "found_passwords.txt");
+        File.AppendAllText(passwordFilePath, password + Environment.NewLine);
     }
 }

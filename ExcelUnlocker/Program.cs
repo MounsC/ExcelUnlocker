@@ -1,4 +1,6 @@
-﻿class Program
+﻿using System.Collections.Concurrent;
+
+class Program
 {
     static void Main(string[] args)
     {
@@ -21,14 +23,16 @@
         Console.WriteLine("Tentatives de mot de passe:");
         Console.WriteLine(attemptCount);
 
-        for (int length = config.MinPasswordLength; length <= config.MaxPasswordLength; length++)
+        var passwordFound = new ConcurrentBag<string>();
+
+        Parallel.For(config.MinPasswordLength, config.MaxPasswordLength + 1, length =>
         {
             var passwords = passwordGenerator.GeneratePasswords(length);
 
-            foreach (var password in passwords)
+            Parallel.ForEach(passwords, password =>
             {
-                if (testedPasswords.Contains(password))
-                    continue;
+                if (testedPasswords.Contains(password) || passwordFound.Count > 0)
+                    return;
 
                 attemptCount++;
                 Console.SetCursorPosition(0, 1);
@@ -39,20 +43,27 @@
                 if (excelHandler.TryOpenExcel(excelFilePath, password))
                 {
                     Console.WriteLine($"\nMot de passe trouvé: {password}");
-                    SaveTestedPasswords(testedPasswords);
+                    passwordFound.Add(password);
                     return;
                 }
 
                 testedPasswords.Add(password);
-                if (attemptCount % 10000 == 0)
+                if (attemptCount % 1000 == 0)
                 {
                     SaveTestedPasswords(testedPasswords);
                 }
-            }
-        }
+            });
+        });
 
-        SaveTestedPasswords(testedPasswords);
-        Console.WriteLine($"\nMot de passe non trouvé après {attemptCount} tentatives.");
+        if (passwordFound.Count == 0)
+        {
+            SaveTestedPasswords(testedPasswords);
+            Console.WriteLine($"\nMot de passe non trouvé après {attemptCount} tentatives.");
+        }
+        else
+        {
+            excelHandler.SavePassword(passwordFound.First());
+        }
     }
 
     static HashSet<string> LoadTestedPasswords()
